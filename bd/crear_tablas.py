@@ -15,12 +15,13 @@ def inicializar_bd():
     cursor.execute('''CREATE TABLE IF NOT EXISTS familias (
         id_hogar INTEGER PRIMARY KEY AUTOINCREMENT, calle TEXT NOT NULL, numero_casa TEXT, 
         jefe_familia TEXT NOT NULL, cedula_jefe TEXT UNIQUE NOT NULL, nro_carga_familiar INTEGER NOT NULL, 
-        estatus TEXT DEFAULT 'Activo')''')
+        estatus TEXT DEFAULT 'Activo',
+        fecha_nacimiento TEXT)''')
 
     # 3. Habitantes
     cursor.execute('''CREATE TABLE IF NOT EXISTS habitantes (
         id_beneficiario INTEGER PRIMARY KEY AUTOINCREMENT, cedula TEXT UNIQUE, 
-        id_hogar INTEGER, nombres TEXT NOT NULL, genero TEXT, parentesco TEXT,
+        id_hogar INTEGER, nombres TEXT NOT NULL, genero TEXT, parentesco TEXT, fecha_nacimiento TEXT,
         FOREIGN KEY (id_hogar) REFERENCES familias(id_hogar))''')
 
     # 4. Inventario

@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import shutil
 import os
+import sys
 
 from vistas.inicio import VistaInicio
 from vistas.familias import VistaFamilias
@@ -91,9 +92,20 @@ class AppPrincipal(ctk.CTk):
         if origen:
             if messagebox.askyesno("Advertencia", "Esto reemplazará toda la información actual del sistema. ¿Estás seguro de continuar?"):
                 try:
+                    # 1. Copiar y reemplazar el archivo de base de datos
                     shutil.copy(origen, self.ruta_bd)
-                    messagebox.showinfo("Éxito", "Base de datos cargada correctamente.\nEl sistema se cerrará para aplicar los cambios.")
-                    self.destroy()
+                    
+                    messagebox.showinfo(
+                        "Éxito", 
+                        "Base de datos cargada correctamente.\nEl sistema se reiniciará automáticamente."
+                    )
+                    
+                    # 2. Obtener ejecutable y argumentos
+                    python = sys.executable
+                    
+                    # 3. Reemplazar proceso actual por una nueva instancia
+                    os.execl(python, python, *sys.argv)
+
                 except Exception as e:
                     messagebox.showerror("Error", f"No se pudo cargar la base de datos:\n{e}")
 

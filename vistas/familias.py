@@ -1,6 +1,22 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 import sqlite3
+from datetime import datetime
+
+def calcular_edad(fecha_nac_str):
+    if not fecha_nac_str:
+        return "N/A"
+    try:
+        fn = datetime.strptime(fecha_nac_str, "%Y-%m-%d")
+        hoy = datetime.today()
+        edad = hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+
+        if edad < 0:
+            return "Inválida"
+            
+        return edad
+    except ValueError:
+        return "N/A"
 
 class VistaFamilias(ctk.CTkFrame):
     def __init__(self, parent, controlador):
@@ -21,7 +37,6 @@ class VistaFamilias(ctk.CTkFrame):
         self.btn_eliminar = ctk.CTkButton(self.frame_botones, text="🗑️ Eliminar", font=("Arial", 14, "bold"), fg_color="#DC3545", command=self.eliminar_seleccion)
         self.btn_eliminar.pack(side="left", padx=10)
 
-        # BARRA DE BÚSQUEDA AÑADIDA AL LADO DEL BOTÓN ELIMINAR
         ctk.CTkLabel(self.frame_botones, text="🔍 Buscar:").pack(side="left", padx=(30, 5))
         self.e_buscar = ctk.CTkEntry(self.frame_botones, placeholder_text="Cédula, nombre o calle...", width=250)
         self.e_buscar.pack(side="left", padx=5)
@@ -35,22 +50,26 @@ class VistaFamilias(ctk.CTkFrame):
         estilo.configure("Treeview", rowheight=35, font=("Arial", 12), borderwidth=0)
         estilo.configure("Treeview.Heading", font=("Arial", 12, "bold"), background="#F4F6F9", foreground="#1E2B3C")
 
-        self.tabla = ttk.Treeview(self.frame_tabla, columns=("ID", "Calle", "Casa", "Jefe", "Cédula", "Carga", "Estatus"), show="headings")
+        self.tabla = ttk.Treeview(self.frame_tabla, columns=("ID", "Calle", "Casa", "Jefe", "Cédula", "F. Nacimiento", "Edad", "Carga", "Estatus"), show="headings")
         self.tabla.heading("ID", text="ID")
         self.tabla.heading("Calle", text="Calle")
         self.tabla.heading("Casa", text="Casa")
         self.tabla.heading("Jefe", text="Jefe de Familia")
         self.tabla.heading("Cédula", text="Cédula")
+        self.tabla.heading("F. Nacimiento", text="F. Nacimiento")
+        self.tabla.heading("Edad", text="Edad")
         self.tabla.heading("Carga", text="Carga Fam.")
         self.tabla.heading("Estatus", text="Estatus")
         
-        self.tabla.column("ID", width=50, anchor="center", stretch=False)
-        self.tabla.column("Calle", width=120, anchor="center")
-        self.tabla.column("Casa", width=70, anchor="center")
-        self.tabla.column("Jefe", width=250, anchor="w")
-        self.tabla.column("Cédula", width=120, anchor="center")
-        self.tabla.column("Carga", width=100, anchor="center")
-        self.tabla.column("Estatus", width=100, anchor="center")
+        self.tabla.column("ID", width=40, anchor="center", stretch=False)
+        self.tabla.column("Calle", width=110, anchor="center")
+        self.tabla.column("Casa", width=60, anchor="center")
+        self.tabla.column("Jefe", width=200, anchor="w")
+        self.tabla.column("Cédula", width=100, anchor="center")
+        self.tabla.column("F. Nacimiento", width=110, anchor="center")
+        self.tabla.column("Edad", width=60, anchor="center")
+        self.tabla.column("Carga", width=90, anchor="center")
+        self.tabla.column("Estatus", width=90, anchor="center")
         
         self.tabla.pack(fill="both", expand=True, padx=20, pady=20)
         self.cargar_datos()
@@ -60,21 +79,33 @@ class VistaFamilias(ctk.CTkFrame):
 
     def cargar_datos(self):
         for f in self.tabla.get_children(): self.tabla.delete(f)
-        conexion = self.conectar_bd()
-        for fila in conexion.cursor().execute("SELECT id_hogar, calle, numero_casa, jefe_familia, cedula_jefe, nro_carga_familiar, estatus FROM familias"):
-            self.tabla.insert("", "end", values=fila)
-        conexion.close()
+        try:
+            conexion = self.conectar_bd()
+            for fila in conexion.cursor().execute("SELECT id_hogar, calle, numero_casa, jefe_familia, cedula_jefe, fecha_nacimiento, nro_carga_familiar, estatus FROM familias"):
+                id_h, calle, casa, jefe, ced, f_nac, carga, estatus = fila
+                edad = calcular_edad(f_nac)
+                f_nac_mostrar = f_nac if f_nac else "N/A"
+                self.tabla.insert("", "end", values=(id_h, calle, casa, jefe, ced, f_nac_mostrar, edad, carga, estatus))
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error BD", f"Error al cargar datos:\n{e}")
 
     def filtrar_datos(self, event=None):
         termino = self.e_buscar.get().lower()
         for f in self.tabla.get_children(): self.tabla.delete(f)
-        conexion = self.conectar_bd()
-        for fila in conexion.cursor().execute("SELECT id_hogar, calle, numero_casa, jefe_familia, cedula_jefe, nro_carga_familiar, estatus FROM familias"):
-            # Convierte la fila entera en texto para buscar el término
-            texto_fila = " ".join(str(val).lower() for val in fila)
-            if termino in texto_fila:
-                self.tabla.insert("", "end", values=fila)
-        conexion.close()
+        try:
+            conexion = self.conectar_bd()
+            for fila in conexion.cursor().execute("SELECT id_hogar, calle, numero_casa, jefe_familia, cedula_jefe, fecha_nacimiento, nro_carga_familiar, estatus FROM familias"):
+                id_h, calle, casa, jefe, ced, f_nac, carga, estatus = fila
+                edad = calcular_edad(f_nac)
+                f_nac_mostrar = f_nac if f_nac else "N/A"
+                fila_completa = (id_h, calle, casa, jefe, ced, f_nac_mostrar, edad, carga, estatus)
+                texto_fila = " ".join(str(val).lower() for val in fila_completa)
+                if termino in texto_fila:
+                    self.tabla.insert("", "end", values=fila_completa)
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error BD", f"Error al filtrar datos:\n{e}")
 
     def eliminar_seleccion(self):
         item = self.tabla.focus()
@@ -96,40 +127,69 @@ class VistaFamilias(ctk.CTkFrame):
     def abrir_modal(self, datos=None):
         modal = ctk.CTkToplevel(self.controlador)
         modal.title("Formulario Familia")
-        modal.geometry("400x550")
+        modal.geometry("400x400")
         modal.grab_set()
 
         e_calle = ctk.CTkEntry(modal, placeholder_text="Calle / Sector", width=300)
-        e_calle.pack(pady=10)
+        e_calle.pack(pady=8)
         e_casa = ctk.CTkEntry(modal, placeholder_text="Número de Casa", width=300)
-        e_casa.pack(pady=10)
+        e_casa.pack(pady=8)
         e_jefe = ctk.CTkEntry(modal, placeholder_text="Nombre del Jefe", width=300)
-        e_jefe.pack(pady=10)
+        e_jefe.pack(pady=8)
         e_ced = ctk.CTkEntry(modal, placeholder_text="Cédula", width=300)
-        e_ced.pack(pady=10)
+        e_ced.pack(pady=8)
+        
+        e_fnac = ctk.CTkEntry(modal, placeholder_text="Fecha Nac. (AAAA-MM-DD)", width=300)
+        e_fnac.pack(pady=8)
+        
         e_carga = ctk.CTkEntry(modal, placeholder_text="Carga Familiar", width=300)
-        e_carga.pack(pady=10)
+        e_carga.pack(pady=8)
         c_estatus = ctk.CTkComboBox(modal, values=["Activo", "Suspendido", "Mudado"], width=300)
-        c_estatus.pack(pady=10)
+        c_estatus.pack(pady=8)
 
         if datos:
-            e_calle.insert(0, datos[1]); e_casa.insert(0, datos[2])
-            e_jefe.insert(0, datos[3]); e_ced.insert(0, datos[4])
-            e_carga.insert(0, datos[5]); c_estatus.set(datos[6])
+            e_calle.insert(0, datos[1])
+            e_casa.insert(0, datos[2])
+            e_jefe.insert(0, datos[3])
+            e_ced.insert(0, datos[4])
+            if datos[5] != "N/A":
+                e_fnac.insert(0, datos[5])
+            e_carga.insert(0, datos[7])
+            c_estatus.set(datos[8])
 
         def guardar():
+            fnac_val = e_fnac.get().strip()
+            if fnac_val:
+                try:
+                    # Convierte el texto ingresado a un objeto de fecha
+                    fecha_ingresada = datetime.strptime(fnac_val, "%Y-%m-%d").date()
+                    hoy = datetime.today().date()
+
+                    # Validación contra fechas futuras (edades negativas)
+                    if fecha_ingresada > hoy:
+                        messagebox.showerror("Error", "La fecha de nacimiento no puede ser una fecha futura.")
+                        return
+
+                except ValueError:
+                    messagebox.showerror("Error", "La fecha debe tener el formato AAAA-MM-DD (Ej: 1990-05-15)")
+                    return
+
             conexion = self.conectar_bd()
             try:
                 if datos:
-                    conexion.cursor().execute("UPDATE familias SET calle=?, numero_casa=?, jefe_familia=?, cedula_jefe=?, nro_carga_familiar=?, estatus=? WHERE id_hogar=?",
-                                              (e_calle.get(), e_casa.get(), e_jefe.get(), e_ced.get(), e_carga.get(), c_estatus.get(), datos[0]))
+                    conexion.cursor().execute(
+                        "UPDATE familias SET calle=?, numero_casa=?, jefe_familia=?, cedula_jefe=?, fecha_nacimiento=?, nro_carga_familiar=?, estatus=? WHERE id_hogar=?",
+                        (e_calle.get(), e_casa.get(), e_jefe.get(), e_ced.get(), fnac_val, e_carga.get(), c_estatus.get(), datos[0])
+                    )
                 else:
-                    conexion.cursor().execute("INSERT INTO familias (calle, numero_casa, jefe_familia, cedula_jefe, nro_carga_familiar, estatus) VALUES (?,?,?,?,?,?)",
-                                              (e_calle.get(), e_casa.get(), e_jefe.get(), e_ced.get(), e_carga.get(), c_estatus.get()))
+                    conexion.cursor().execute(
+                        "INSERT INTO familias (calle, numero_casa, jefe_familia, cedula_jefe, fecha_nacimiento, nro_carga_familiar, estatus) VALUES (?,?,?,?,?,?,?)",
+                        (e_calle.get(), e_casa.get(), e_jefe.get(), e_ced.get(), fnac_val, e_carga.get(), c_estatus.get())
+                    )
                 conexion.commit()
                 modal.destroy()
                 self.cargar_datos()
-                self.e_buscar.delete(0, 'end') # Limpia el buscador si estaba activo
+                self.e_buscar.delete(0, 'end')
             except sqlite3.IntegrityError:
                 messagebox.showerror("Error", "Cédula duplicada.")
             finally:
